@@ -1,0 +1,299 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FIFA 4x4 Predictor AI Advanced</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#071b16;color:#fff;font-family:Arial}
+header{text-align:center;padding:22px;background:#063c2b}
+h1{color:#51f5a0;font-size:23px;margin:0}
+header p{font-size:12px;color:#c9e9da}
+main{max-width:850px;margin:auto;padding:13px}
+.card{background:#10372b;padding:15px;border-radius:13px;margin:12px 0}
+.match{text-align:center;background:#164b37}
+.teams{display:flex;justify-content:space-around;font-weight:bold}
+button{border:0;border-radius:8px;padding:12px;background:#1cbd70;color:#062b1c;font-weight:bold;cursor:pointer}
+.tabs{display:flex;gap:7px}
+.tabs button{flex:1;background:#244c40;color:white}
+.tabs button.active{background:#21d17c;color:#063323}
+input,textarea,select{width:100%;padding:12px;border:1px solid #416b5b;border-radius:8px;background:#09271e;color:white;margin:5px 0}
+textarea{min-height:140px;font-family:monospace}
+h3{color:#53f3a0}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.item{background:#1c4538;padding:11px;border-radius:8px;font-size:13px}
+.item strong{color:#59f3a0;float:right}
+.result{background:#183f31;padding:12px;border-radius:9px;margin:8px 0}
+.big{font-size:27px;color:#59f3a0;font-weight:bold}
+.muted{color:#b5cbbf;font-size:12px;line-height:1.6}
+.bar{height:9px;background:#294c40;border-radius:10px;margin-top:8px;overflow:hidden}
+.fill{height:100%;background:#42e89b}
+.hidden{display:none}
+.warning{background:#55401a;color:#ffe7a8;padding:12px;border-radius:8px;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:9px;border-bottom:1px solid #315345;text-align:left}
+footer{text-align:center;color:#9bb9aa;padding:25px;font-size:12px}
+</style>
+</head>
+<body>
+
+<header>
+<h1>⚽ FIFA 4x4 PREDICTOR AI</h1>
+<p>ADVANCED STATISTICAL ENGINE V2.0</p>
+</header>
+
+<main>
+
+<div class="card match">
+<h2>BOURNEMOUTH VS BRIGHTON</h2>
+<div class="teams">
+<span>🔴 Bournemouth</span>
+<span>🔵 Brighton</span>
+</div>
+<p>FC 24 • 4x4 • Angleterre</p>
+</div>
+
+<div class="warning">
+Les cotes enregistrées sont celles visibles dans tes captures.
+Les listes de scores exacts sont partielles. Les probabilités calculées
+sont conditionnelles aux scores renseignés, pas des probabilités réelles garanties.
+</div>
+
+<div class="card">
+<h3>1. Choisir le marché</h3>
+<div class="tabs">
+<button class="active" onclick="changeMode('full',this)">Temps réglementaire</button>
+<button onclick="changeMode('half',this)">1ère mi-temps</button>
+</div>
+</div>
+
+<div class="card">
+<h3>2. Données des scores exacts</h3>
+<p class="muted">Format : score,cote. Une ligne par score. Tu peux modifier ou ajouter des lignes.</p>
+<textarea id="scoreInput"></textarea>
+<button onclick="calculate()">⚡ LANCER L'ANALYSE</button>
+<button onclick="resetData()" style="background:#b94e4e;color:white">Réinitialiser</button>
+</div>
+
+<div class="card">
+<h3>3. Résultats statistiques</h3>
+<div id="status" class="muted">Appuie sur LANCER L'ANALYSE.</div>
+<div id="results"></div>
+</div>
+
+<div class="card">
+<h3>4. Analyse des buts</h3>
+<div id="goals" class="muted">Les résultats apparaîtront ici.</div>
+</div>
+
+<div class="card">
+<h3>5. Analyse des marchés</h3>
+<div id="markets" class="muted">Sélectionne un marché pour afficher les probabilités.</div>
+</div>
+
+<div class="card">
+<h3>6. Comprendre les résultats</h3>
+<div id="explanation" class="muted">
+Le moteur utilise les cotes fournies, leur probabilité implicite et leur normalisation.
+</div>
+</div>
+
+</main>
+
+<footer>
+FIFA 4x4 PREDICTOR AI ADVANCED<br>
+Statistical analysis • No guaranteed prediction
+</footer>
+
+<script>
+const datasets = {
+
+full: [
+"6-5,54","5-5,66","4-6,64",
+"7-5,52","6-6,37","5-6,44",
+"7-6,36","7-7,30","4-7,50",
+"8-5,58","8-8,37","5-7,35",
+"8-6,42","9-9,67","6-7,30",
+"8-7,36","4-8,46","9-6,56",
+"5-8,33","9-7,51","6-8,29",
+"7-8,30","4-9,49","9-8,54",
+"5-9,36","6-9,33","7-9,35",
+"8-9,45","4-10,59","5-10,45",
+"6-10,42","7-10,47","8-10,62"
+].join("\n"),
+
+half: [
+"2-1,71","2-2,29","1-2,59",
+"3-1,52","3-3,15","1-3,36",
+"3-2,22","4-4,17","2-3,18",
+"4-1,53","5-5,41","1-4,31",
+"4-2,24","2-4,17","4-3,17",
+"3-4,14","5-1,72","1-5,35"
+].join("\n")
+};
+
+const markets = {
+full:[
+["Bournemouth +4.5",1.16,4.53],
+["Bournemouth +5.5",1.448,2.69],
+["Bournemouth +6.5",1.975,1.87],
+["Bournemouth +7.5",2.85,1.405],
+["Bournemouth +8.5",4.58,1.16],
+["Brighton +6.5",1.344,3.12],
+["Brighton +7.5",1.736,2.10],
+["Brighton +8.5",2.38,1.552],
+["Brighton +9.5",3.59,1.275]
+],
+half:[
+["Total +5.5",1.205,3.98],
+["Total +6.5",1.55,2.39],
+["Total +7.5",2.21,1.665],
+["Total +8.5",3.475,1.29],
+["Bournemouth +2.5",1.44,2.712],
+["Bournemouth +3.5",2.275,1.63],
+["Bournemouth +4.5",4.17,1.19],
+["Brighton +2.5",1.195,4.08],
+["Brighton +3.5",1.685,2.18],
+["Brighton +4.5",2.685,1.448]
+]
+};
+
+let mode="full";
+
+function changeMode(m,btn){
+ mode=m;
+ document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+ btn.classList.add("active");
+ document.getElementById("scoreInput").value=datasets[m];
+ clearResults();
+}
+
+function resetData(){
+ document.getElementById("scoreInput").value=datasets[mode];
+ clearResults();
+}
+
+function clearResults(){
+ document.getElementById("results").innerHTML="";
+ document.getElementById("goals").innerHTML="";
+ document.getElementById("markets").innerHTML="";
+ document.getElementById("status").innerText="Données prêtes. Lance l'analyse.";
+}
+
+function readData(){
+ const lines=document.getElementById("scoreInput").value.split("\n");
+ const data=[];
+ const errors=[];
+ lines.forEach((line,i)=>{
+  if(!line.trim())return;
+  const p=line.split(",");
+  const match=p[0].trim().match(/^(\d+)-(\d+)$/);
+  const odd=Number(p[1]);
+  if(!match||!Number.isFinite(odd)||odd<=1){
+   errors.push("Ligne "+(i+1)+" incorrecte");
+   return;
+  }
+  data.push({
+   score:p[0].trim(),
+   a:Number(match[1]),
+   b:Number(match[2]),
+   odd
+  });
+ });
+ if(errors.length)throw new Error(errors.join(", "));
+ if(data.length<3)throw new Error("Ajoute au moins 3 scores valides.");
+ if(new Set(data.map(x=>x.score)).size!==data.length)
+  throw new Error("Il y a des scores en double.");
+ return data;
+}
+
+function calculate(){
+ try{
+  const data=readData();
+  const sum=data.reduce((s,x)=>s+1/x.odd,0);
+  data.forEach(x=>{
+   x.raw=1/x.odd;
+   x.prob=x.raw/sum*100;
+  });
+  data.sort((a,b)=>b.prob-a.prob);
+
+  showScores(data,sum);
+  showGoals(data);
+  showMarkets();
+  document.getElementById("status").innerHTML=
+   "Analyse terminée : "+data.length+
+   " scores valides.<br>Somme des probabilités brutes : "+
+   (sum*100).toFixed(2)+" %.";
+ }catch(e){
+  document.getElementById("status").innerText="Erreur : "+e.message;
+ }
+}
+
+function showScores(data,sum){
+ const top=data.slice(0,5);
+ let html="<p class='muted'>Top 5 selon les cotes normalisées :</p>";
+ top.forEach((x,i)=>{
+  html+=`
+  <div class="result">
+   <b>${i+1}. Score ${x.score}</b>
+   <div class="big">${x.prob.toFixed(2)} %</div>
+   <span class="muted">Cote : ${x.odd}</span>
+   <div class="bar"><div class="fill" style="width:${x.prob}%"></div></div>
+  </div>`;
+ });
+ html+=`
+ <p class="muted">
+ Somme des probabilités implicites brutes : ${(sum*100).toFixed(2)} %.
+ Les probabilités normalisées sont calculées uniquement sur les scores présents.
+ </p>`;
+ document.getElementById("results").innerHTML=html;
+}
+
+function showGoals(data){
+ const total=data.reduce((s,x)=>s+x.prob,0);
+ const a=data.reduce((s,x)=>s+x.a*x.prob,0)/total;
+ const b=data.reduce((s,x)=>s+x.b*x.prob,0)/total;
+ const totalGoals=a+b;
+ const homeWins=data.filter(x=>x.a>x.b).reduce((s,x)=>s+x.prob,0);
+ const draws=data.filter(x=>x.a===x.b).reduce((s,x)=>s+x.prob,0);
+ const awayWins=data.filter(x=>x.a<x.b).reduce((s,x)=>s+x.prob,0);
+
+ document.getElementById("goals").innerHTML=`
+ <div class="grid">
+ <div class="item">Moyenne Bournemouth<strong>${a.toFixed(2)}</strong></div>
+ <div class="item">Moyenne Brighton<strong>${b.toFixed(2)}</strong></div>
+ <div class="item">Moyenne totale<strong>${totalGoals.toFixed(2)}</strong></div>
+ <div class="item">Nombre de scores<strong>${data.length}</strong></div>
+ </div>
+ <h4>Répartition conditionnelle</h4>
+ <p>Bournemouth devant : ${homeWins.toFixed(2)} %</p>
+ <p>Égalité : ${draws.toFixed(2)} %</p>
+ <p>Brighton devant : ${awayWins.toFixed(2)} %</p>
+ <p class="muted">Ces chiffres décrivent seulement les scores enregistrés, pas l'ensemble des résultats possibles.</p>
+ `;
+}
+
+function showMarkets(){
+ const list=markets[mode];
+ let html="<table><tr><th>Marché</th><th>Plus</th><th>Moins</th></tr>";
+ list.forEach(m=>{
+  const p1=1/m[1],p2=1/m[2];
+  const total=p1+p2;
+  const over=p1/total*100;
+  const under=p2/total*100;
+  html+=`<tr>
+  <td>${m[0]}</td>
+  <td>${over.toFixed(1)} %</td>
+  <td>${under.toFixed(1)} %</td>
+  </tr>`;
+ });
+ html+="</table><p class='muted'>Probabilités implicites normalisées à partir des deux cotes, marge du bookmaker retirée approximativement.</p>";
+ document.getElementById("markets").innerHTML=html;
+}
+
+document.getElementById("scoreInput").value=datasets.full;
+</script>
+</body>
+</html>
